@@ -20,7 +20,7 @@ var (
 )
 
 func main() {
-	ip := "8081"
+	port := "8081"
 	go broadcast()
 	fmt.Println("tcp server is listening " + port)
 	listener, err := net.Listen("tcp", "0.0.0.0:" + port)
