@@ -20,9 +20,10 @@ var (
 )
 
 func main() {
+	ip := "8081"
 	go broadcast()
-	fmt.Println("tcp server is listening 8080")
-	listener, err := net.Listen("tcp", "0.0.0.0:8080")
+	fmt.Println("tcp server is listening " + port)
+	listener, err := net.Listen("tcp", "0.0.0.0:" + port)
 	fmt.Println("lite-chat server started")
 	if err != nil {
 		fmt.Println("fatal err: ", err)

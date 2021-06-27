@@ -9,8 +9,10 @@ import (
 )
 
 func main() {
-	fmt.Println("lite-chat client is connecting to server=192.168.0.110:8080")
-	conn, err := net.Dial("tcp", "192.168.0.110:8080")
+	ip, port := "47.101.134.245", "8081"
+	host := ip + host
+	fmt.Println("lite-chat client is connecting to server=" + host)
+	conn, err := net.Dial("tcp", host)
 	if err != nil {
 		fmt.Println("connect err: ", err)
 	}
