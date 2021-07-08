@@ -9,7 +9,8 @@ import (
 )
 
 func main() {
-	ip, port := "47.101.134.245", "8081"
+	ip, port := "localhost", "8081"
+	//ip, port := "47.101.134.245", "8081"
 	host := ip + ":" + port
 	fmt.Println("lite-chat client is connecting to server=" + host)
 	conn, err := net.Dial("tcp", host)
@@ -24,8 +25,7 @@ func main() {
 	go func(conn net.Conn) {
 		for {
 			if err := util.MustCopy(os.Stdout, conn); err != nil {
-				//fmt.Println("copy err: ", err)
-				return
+				fmt.Println("MustCopy err", err)
 			}
 		}
 	}(conn)
@@ -33,12 +33,12 @@ func main() {
 	for input.Scan() {
 		text := input.Text()
 		if text == "bye" {
+			fmt.Println("test")
 			return
 		}
-		if _, err := fmt.Fprintln(conn, text); err != nil {
+		if n, err := fmt.Fprintln(conn, text); err != nil || n == 0 {
 			fmt.Println(err)
 			return
 		}
 	}
 }
-
