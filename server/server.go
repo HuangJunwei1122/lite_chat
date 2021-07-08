@@ -140,7 +140,7 @@ func handleClient(client *Client) {
 	for {
 		room := enterRoom(client)
 		if room == nil {
-			break
+			continue
 		}
 		who := fmt.Sprintf("%d-%s", client.ID, client.name)
 		input := bufio.NewScanner(conn)
