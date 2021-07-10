@@ -90,7 +90,6 @@ func handleRoom() {
 			fmt.Printf("close room=%d, available rooms=%v\n", rid, rooms)
 		case <-closing:
 			break
-		default:
 		}
 	}
 }
