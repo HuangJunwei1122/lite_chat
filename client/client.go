@@ -19,8 +19,8 @@ func main() {
 	fmt.Println("lite-chat start...")
 	conn, err := net.Dial("tcp", host)
 	if err != nil {
-		fmt.Printf("Sorry, something went wrong...\n" +
-			"lite-chat will be more awesome if u can send the err to %s! See u", AUTHOR)
+		fmt.Printf("\nSorry, something went wrong...\n" +
+			"lite-chat will be more awesome if u can send the err to %s! See u~", AUTHOR)
 		return
 	}
 	fmt.Println("connected ")
