@@ -10,12 +10,13 @@ import (
 
 func main() {
 	//ip, port := "localhost", "8080"
-	ip, port := " 123.57.29.103", "8080"
+	ip, port := "123.57.29.103", "8080"
 	host := ip + ":" + port
 	fmt.Println("lite-chat client is connecting to server")
 	conn, err := net.Dial("tcp", host)
 	if err != nil {
 		fmt.Println("connect err: ", err)
+		return
 	}
 	fmt.Println("connected ")
 	defer func() {
