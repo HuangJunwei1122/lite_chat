@@ -182,8 +182,8 @@ func enterRoom(client *Client) *Room {
 			return nil
 		}
 		if roomID, err2 := strconv.Atoi(rid); err2 != nil {
-			_, _ = io.WriteString(conn, "Invalid room ID")
-			return nil
+			_, _ = io.WriteString(conn, "Invalid room ID\n")
+			continue
 		} else {
 			resp := make(chan int)
 			entering <- &EnterMsg{roomID, client, resp}
@@ -211,7 +211,7 @@ func writeConn(client *Client) {
 }
 
 func main() {
-	port := "8081"
+	port := "8080"
 	go handleRoom()
 	defer func() {
 		close(closing)
