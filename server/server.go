@@ -151,6 +151,7 @@ func handleClient(client *Client) {
 			room.messages <- who + ": " + msg
 		}
 		room.leaving <- client
+		return
 	}
 }
 
