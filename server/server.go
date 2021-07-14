@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"log"
 )
 
 const (
@@ -15,15 +16,17 @@ const (
 	MsgEnterOk  = 0
 	MsgRoomFull = 1
 	MsgNoRoom   = 2
+	MsgPWFail = 3
 )
 
 type Room struct {
-	ID       int
-	members  map[int]*Client
-	entering chan *Client
-	leaving  chan *Client
-	messages chan string
-	maxMID   int
+	ID        int
+	members   map[int]*Client
+	entering  chan *Client
+	leaving   chan *Client
+	messages  chan string
+	maxMID    int
+	PassWord  string
 }
 
 type Client struct {
@@ -34,9 +37,10 @@ type Client struct {
 }
 
 type EnterMsg struct {
-	RID      int
-	Member   *Client
-	Resp     chan int
+	RID       int
+	Member    *Client
+	Resp      chan int
+	PassWord  string
 }
 
 var (
@@ -48,10 +52,11 @@ var (
 		MsgEnterOk:  "Enter room success.\n",
 		MsgNoRoom:   "There is no room you are looking for, try other rooms.\n",
 		MsgRoomFull: "There is no vacancy in this room.\n",
+		MsgPWFail: "Incorrect password.\n",
 	}
 )
 
-func tryEnterRoom(client *Client, rid int) int {
+func tryEnterRoom(client *Client, rid int, passwd string) int {
 	room, ok := rooms[rid]
 	if !ok {
 		if len(rooms) < RoomNumLimit {
@@ -61,6 +66,7 @@ func tryEnterRoom(client *Client, rid int) int {
 				entering: make(chan *Client, RoomPlayerLimit),
 				leaving: make(chan *Client, RoomPlayerLimit),
 				messages: make(chan string, RoomPlayerLimit),
+				PassWord: passwd,
 			}
 			go runRoom(&newRoom)
 			newRoom.entering <- client
@@ -70,6 +76,9 @@ func tryEnterRoom(client *Client, rid int) int {
 			return MsgNoRoom
 		}
 	} else {
+		if room.PassWord != passwd {
+			return MsgPWFail
+		}
 		if len(room.members) < RoomPlayerLimit {
 			room.entering <- client
 			return MsgEnterOk
@@ -83,11 +92,11 @@ func handleRoom() {
 	for {
 		select {
 		case msg := <- entering:
-			msg.Resp <- tryEnterRoom(msg.Member, msg.RID)
-			fmt.Printf("create room=%d, available rooms=%v\n", msg.RID, rooms)
+			msg.Resp <- tryEnterRoom(msg.Member, msg.RID, msg.PassWord)
+			log.Printf("create room=%d, available rooms=%v\n", msg.RID, rooms)
 		case rid := <- leaving:
 			delete(rooms, rid)
-			fmt.Printf("close room=%d, available rooms=%v\n", rid, rooms)
+			log.Printf("close room=%d, available rooms=%v\n", rid, rooms)
 		case <-closing:
 			break
 		}
@@ -124,14 +133,14 @@ func handleClient(client *Client) {
 	defer func() {
 		close(client.MsgChan)
 		conn.Close()
-		fmt.Printf("connection lost: %s\n", conn.RemoteAddr().String())
+		log.Printf("connection lost: %s\n", conn.RemoteAddr().String())
 	}()
 	go writeConn(client)
 
 	// try login
 	err := login(client)
 	if err != nil {
-		fmt.Printf("handleClient err, login fail, client=%s-%s, err=%s\n",
+		log.Printf("handleClient err, login fail, client=%s-%s, err=%s\n",
 			client.name, conn.RemoteAddr().String(), err.Error())
 	}
 
@@ -151,7 +160,9 @@ func handleClient(client *Client) {
 			room.messages <- who + ": " + msg
 		}
 		room.leaving <- client
-		return
+		if _, err := io.WriteString(conn, "\nyou are leaving room.\n"); err != nil {
+			return
+		}
 	}
 }
 
@@ -173,7 +184,7 @@ func login(client *Client) error {
 
 func enterRoom(client *Client) *Room {
 	conn := *client.Conn
-	var rid string
+	var rid, passwd string
 	for {
 		if _, err := io.WriteString(conn, "Tell me the room(id) you want to go >>> "); err != nil {
 			return nil
@@ -182,22 +193,31 @@ func enterRoom(client *Client) *Room {
 		if err != nil {
 			return nil
 		}
-		if roomID, err2 := strconv.Atoi(rid); err2 != nil {
+		roomID, err := strconv.Atoi(rid)
+		if err != nil {
 			_, _ = io.WriteString(conn, "Invalid room ID\n")
 			continue
-		} else {
-			resp := make(chan int)
-			entering <- &EnterMsg{roomID, client, resp}
-			code := <- resp
-			if msg, ok := response[code]; ok {
-				if _, err := io.WriteString(conn, msg); err != nil {
-					return nil
-				}
-			}
-			if room, ok := rooms[roomID]; code == MsgEnterOk && ok {
-				return room
+		}
+		if _, err := io.WriteString(conn, "Please enter room password >>> "); err != nil {
+			return nil
+		}
+		_, err = fmt.Fscanln(conn, &passwd)
+		if err != nil {
+			_, _ = io.WriteString(conn, "Invalid password.\n")
+			return nil
+		}
+		resp := make(chan int)
+		entering <- &EnterMsg{roomID, client, resp, passwd}
+		code := <- resp
+		if msg, ok := response[code]; ok {
+			if _, err := io.WriteString(conn, msg); err != nil {
+				return nil
 			}
 		}
+		if room, ok := rooms[roomID]; code == MsgEnterOk && ok {
+			return room
+		}
+
 	}
 }
 
@@ -205,7 +225,7 @@ func writeConn(client *Client) {
 	for msg := range client.MsgChan {
 		n, err := io.WriteString(*client.Conn, msg)
 		if err != nil {
-			fmt.Printf("writeConn error, n=%d, who=%s-%s, err=%s",
+			log.Printf("writeConn error, n=%d, who=%s-%s, err=%s",
 				n, client.name, (*client.Conn).RemoteAddr().String(), err.Error())
 		}
 	}
@@ -217,18 +237,18 @@ func main() {
 	defer func() {
 		close(closing)
 	}()
-	fmt.Println("tcp server is listening " + port)
+	log.Println("tcp server is listening " + port)
 	listener, err := net.Listen("tcp", "0.0.0.0:" + port)
-	fmt.Println("lite-chat server started")
+	log.Println("lite-chat server started")
 	if err != nil {
-		fmt.Println("fatal err: ", err)
+		log.Println("fatal err: ", err)
 		return
 	}
 	for {
 		conn, err := listener.Accept()
-		fmt.Println("accepted client", conn.RemoteAddr().String())
+		log.Println("accepted client", conn.RemoteAddr().String())
 		if err != nil {
-			fmt.Println("accept err: ", err)
+			log.Println("accept err: ", err)
 			continue
 		}
 		go handleClient(&Client{
