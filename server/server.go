@@ -69,9 +69,9 @@ func tryEnterRoom(client *Client, rid int, passwd string) int {
 				PassWord: passwd,
 			}
 			go runRoom(&newRoom)
-			log.Printf("create room=%d, available rooms=%v\n", rid, rooms)
 			newRoom.entering <- client
 			rooms[rid] = &newRoom
+			log.Printf("create room=%d, available rooms=%v\n", rid, rooms)
 			return MsgEnterOk
 		} else {
 			return MsgNoRoom
