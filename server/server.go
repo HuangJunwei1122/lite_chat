@@ -174,6 +174,7 @@ func login(client *Client) error {
 		}
 		n, err := fmt.Fscanln(conn, &client.name)
 		if n > 0 && err == nil {
+			log.Printf("client %s login success", client.name)
 			return nil
 		}
 		if _, err := io.WriteString(conn, "\nAn awesome name must not be blank.\n"); err != nil {
