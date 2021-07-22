@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"strconv"
-	"log"
 )
 
 const (
@@ -17,6 +17,8 @@ const (
 	MsgRoomFull = 1
 	MsgNoRoom   = 2
 	MsgPWFail = 3
+
+	EndDelim = '\t'
 )
 
 type Room struct {
@@ -71,6 +73,7 @@ func tryEnterRoom(client *Client, rid int, passwd string) int {
 			go runRoom(&newRoom)
 			newRoom.entering <- client
 			rooms[rid] = &newRoom
+			log.Printf("create room=%d, available rooms=%v\n", rid, rooms)
 			return MsgEnterOk
 		} else {
 			return MsgNoRoom
@@ -93,7 +96,6 @@ func handleRoom() {
 		select {
 		case msg := <- entering:
 			msg.Resp <- tryEnterRoom(msg.Member, msg.RID, msg.PassWord)
-			log.Printf("create room=%d, available rooms=%v\n", msg.RID, rooms)
 		case rid := <- leaving:
 			delete(rooms, rid)
 			log.Printf("close room=%d, available rooms=%v\n", rid, rooms)
@@ -114,7 +116,7 @@ func runRoom(room *Room) {
 			room.maxMID += 1
 			room.members[room.maxMID] = client
 			client.ID = room.maxMID
-			room.messages <- fmt.Sprintf("%d-%s entered.", client.ID, client.name)
+			room.messages <- fmt.Sprintf("%s%d entered.", client.name, client.ID)
 		case client := <-room.leaving:
 			delete(room.members, client.ID)
 			clientID := client.ID
@@ -123,7 +125,7 @@ func runRoom(room *Room) {
 				leaving <- room.ID
 				return
 			}
-			room.messages <- fmt.Sprintf("%d-%s left.", clientID, client.name)
+			room.messages <- fmt.Sprintf("%s%d left.", client.name, clientID)
 		}
 	}
 }
@@ -146,11 +148,11 @@ func handleClient(client *Client) {
 
 	// already login
 	for {
-		room := enterRoom(client)
-		if room == nil {
-			continue
+		room, err := enterRoom(client)
+		if err != nil {
+			return
 		}
-		who := fmt.Sprintf("%d-%s", client.ID, client.name)
+		who := fmt.Sprintf("%s%d", client.name, client.ID)
 		input := bufio.NewScanner(conn)
 		for input.Scan() {
 			msg := input.Text()
@@ -160,7 +162,7 @@ func handleClient(client *Client) {
 			room.messages <- who + ": " + msg
 		}
 		room.leaving <- client
-		if _, err := io.WriteString(conn, "\nyou are leaving room.\n"); err != nil {
+		if _, err := writeStringWithEnd(conn, "\nyou are leaving room.\n"); err != nil {
 			return
 		}
 	}
@@ -169,53 +171,60 @@ func handleClient(client *Client) {
 func login(client *Client) error {
 	conn := *client.Conn
 	for {
-		if _, err := io.WriteString(conn, "Tell me your awesome name >>> "); err != nil {
+		if _, err := writeStringWithEnd(conn, "Tell me your awesome name >>> "); err != nil {
 			return err
 		}
 		n, err := fmt.Fscanln(conn, &client.name)
 		if n > 0 && err == nil {
 			return nil
 		}
-		if _, err := io.WriteString(conn, "\nAn awesome name must not be blank.\n"); err != nil {
+		if _, err := writeStringWithEnd(conn, "\nAn awesome name must not be blank.\n"); err != nil {
 			return err
 		}
 	}
 }
 
-func enterRoom(client *Client) *Room {
+func enterRoom(client *Client) (*Room, error) {
 	conn := *client.Conn
 	var rid, passwd string
 	for {
-		if _, err := io.WriteString(conn, "Tell me the room(id) you want to go >>> "); err != nil {
-			return nil
+		if _, err := writeStringWithEnd(conn, "room id >>> "); err != nil {
+			//return nil, err
+			continue
 		}
 		_, err := fmt.Fscanln(conn, &rid)
 		if err != nil {
-			return nil
+			if _, err = writeStringWithEnd(conn, "\nRoom ID can't be empty.\n"); err != nil {
+				return nil, err
+			}
+			continue
 		}
 		roomID, err := strconv.Atoi(rid)
 		if err != nil {
-			_, _ = io.WriteString(conn, "Invalid room ID\n")
+			if _, err = writeStringWithEnd(conn, "\nInvalid room ID.\n"); err != nil {
+				return nil, err
+			}
 			continue
 		}
-		if _, err := io.WriteString(conn, "Please enter room password >>> "); err != nil {
-			return nil
+		if _, err := writeStringWithEnd(conn, "room password >>> "); err != nil {
+			return nil, err
 		}
-		_, err = fmt.Fscanln(conn, &passwd)
-		if err != nil {
-			_, _ = io.WriteString(conn, "Invalid password.\n")
-			return nil
+		if _, err = fmt.Fscanln(conn, &passwd); err != nil {
+			if _, err1 := writeStringWithEnd(conn, "\nPassword can't be empty.\n"); err1 != nil {
+				return nil, err1
+			}
+			continue
 		}
 		resp := make(chan int)
 		entering <- &EnterMsg{roomID, client, resp, passwd}
 		code := <- resp
 		if msg, ok := response[code]; ok {
-			if _, err := io.WriteString(conn, msg); err != nil {
-				return nil
+			if _, err := writeStringWithEnd(conn, msg); err != nil {
+				return nil, err
 			}
 		}
 		if room, ok := rooms[roomID]; code == MsgEnterOk && ok {
-			return room
+			return room, nil
 		}
 
 	}
@@ -223,12 +232,16 @@ func enterRoom(client *Client) *Room {
 
 func writeConn(client *Client) {
 	for msg := range client.MsgChan {
-		n, err := io.WriteString(*client.Conn, msg)
+		n, err := writeStringWithEnd(*client.Conn, msg)
 		if err != nil {
 			log.Printf("writeConn error, n=%d, who=%s-%s, err=%s",
 				n, client.name, (*client.Conn).RemoteAddr().String(), err.Error())
 		}
 	}
+}
+
+func writeStringWithEnd(conn net.Conn, msg string) (int, error) {
+	return io.WriteString(conn, fmt.Sprintf("%s\t", msg))
 }
 
 func main() {

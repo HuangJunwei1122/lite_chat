@@ -1,8 +1,10 @@
 package util
 
 import (
+	"bufio"
 	"fmt"
 	"io"
+	"os"
 )
 
 func MustCopy(dst io.Writer, src io.Reader) error {
@@ -11,7 +13,11 @@ func MustCopy(dst io.Writer, src io.Reader) error {
 }
 
 func MustWrite(dst io.Writer, src string) {
-	if _, err := io.WriteString(dst, src); err != nil {
-		fmt.Println("write string err, ", err)
-	}
+	input := bufio.NewReader()
+	for {
+		text, err := input.ReadString('\n')
+		if err != nil {
+			printWrong()
+			return
+		}
 }

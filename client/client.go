@@ -6,10 +6,14 @@ import (
 	"lite_chat/util"
 	"net"
 	"os"
+	"strings"
+	"time"
 )
 
 const (
 	AUTHOR="huangjw_bupt@qq.com"
+	LiteChat = "lite-chat"
+	GoodByeMsg = "HAVE A NICE DAY! See u next time!\n"
 )
 
 func main() {
@@ -19,31 +23,41 @@ func main() {
 	fmt.Println("lite-chat start...")
 	conn, err := net.Dial("tcp", host)
 	if err != nil {
-		fmt.Printf("\nSorry, something went wrong...\n" +
-			"lite-chat will be more awesome if u can send the err to %s! See u~", AUTHOR)
+		printWrong()
 		return
 	}
 	fmt.Println("connected ")
 	defer func() {
 		conn.Close()
+		sayBye()
+		time.Sleep(10 * time.Second)
 	}()
 	go func(conn net.Conn) {
-		for {
-			if err := util.MustCopy(os.Stdout, conn); err != nil {
-				return
-			}
-		}
+		_ = util.MustCopy(os.Stdout, conn)
 	}(conn)
-	input := bufio.NewScanner(os.Stdin)
-	for input.Scan() {
-		text := input.Text()
+	input := bufio.NewReader(os.Stdin)
+	for {
+		text, err := input.ReadString('\n')
+		if err != nil {
+			printWrong()
+			return
+		}
 		if text == "bye" {
-			fmt.Println("HAVE A NICE DAY! See u~\n                      ——lite-chat")
 			return
 		}
 		if n, err := fmt.Fprintln(conn, text); err != nil || n == 0 {
-			fmt.Println(err)
+			printWrong()
 			return
 		}
 	}
+}
+
+func sayBye() {
+	var spaces [len(GoodByeMsg)]string
+	fmt.Printf("\n%s\n%s——%s\n", GoodByeMsg, strings.Join(spaces[:], " "), LiteChat)
+}
+
+func printWrong() {
+	fmt.Printf("\nSorry, something went wrong...\n" +
+		"lite-chat will be more awesome if u can send the err to %s\n", AUTHOR)
 }

@@ -1,2 +1,4 @@
 *.exe 
 *.prof
+
+./.idea/workspace.xml
