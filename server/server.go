@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"lite_chat/util"
 	"log"
 	"net"
 	"strconv"
@@ -18,7 +19,6 @@ const (
 	MsgNoRoom   = 2
 	MsgPWFail = 3
 
-	EndDelim = '\t'
 )
 
 type Room struct {
@@ -176,6 +176,7 @@ func login(client *Client) error {
 		}
 		n, err := fmt.Fscanln(conn, &client.name)
 		if n > 0 && err == nil {
+			log.Printf("client %s login success", client.name)
 			return nil
 		}
 		if _, err := writeStringWithEnd(conn, "\nAn awesome name must not be blank.\n"); err != nil {
@@ -189,8 +190,7 @@ func enterRoom(client *Client) (*Room, error) {
 	var rid, passwd string
 	for {
 		if _, err := writeStringWithEnd(conn, "room id >>> "); err != nil {
-			//return nil, err
-			continue
+			return nil, err
 		}
 		_, err := fmt.Fscanln(conn, &rid)
 		if err != nil {
@@ -241,7 +241,7 @@ func writeConn(client *Client) {
 }
 
 func writeStringWithEnd(conn net.Conn, msg string) (int, error) {
-	return io.WriteString(conn, fmt.Sprintf("%s\t", msg))
+	return io.WriteString(conn, fmt.Sprintf("%s%c", msg, util.EndDelim))
 }
 
 func main() {

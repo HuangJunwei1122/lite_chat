@@ -4,7 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
+	"strings"
+)
+
+const (
+	EndDelim = '\t'
 )
 
 func MustCopy(dst io.Writer, src io.Reader) error {
@@ -12,12 +16,20 @@ func MustCopy(dst io.Writer, src io.Reader) error {
 	return err
 }
 
-func MustWrite(dst io.Writer, src string) {
-	input := bufio.NewReader()
+func PrintStdout(src io.Reader) error {
+	input := bufio.NewReader(src)
+	var lastLineLen int
 	for {
-		text, err := input.ReadString('\n')
-		if err != nil {
-			printWrong()
-			return
+		text, err := input.ReadString(EndDelim)
+		if len(text) <= 0 {
+			 return nil
 		}
+		text = text[:len(text) - 1]
+		if err != nil {
+			return err
+		}
+		fmt.Printf("\r\b\r%s\r%s\n", strings.Join(make([]string, lastLineLen), " "), text)
+		lines := strings.Split(text, "\n")
+		lastLineLen = len(lines[len(lines)-1])
+	}
 }

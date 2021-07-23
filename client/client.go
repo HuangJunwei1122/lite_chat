@@ -20,7 +20,7 @@ func main() {
 	//ip, port := "localhost", "8080"
 	ip, port := "123.57.29.103", "8080"
 	host := ip + ":" + port
-	fmt.Println("lite-chat start...")
+	fmt.Println("Welcome to lite-chat!\nYou can input 'bye' to quit anytime and input 'exit' to switch other rooms")
 	conn, err := net.Dial("tcp", host)
 	if err != nil {
 		printWrong()
@@ -33,7 +33,8 @@ func main() {
 		time.Sleep(10 * time.Second)
 	}()
 	go func(conn net.Conn) {
-		_ = util.MustCopy(os.Stdout, conn)
+		//_ = util.MustCopy(os.Stdout, conn)
+		_ = util.PrintStdout(conn)
 	}(conn)
 	input := bufio.NewReader(os.Stdin)
 	for {
@@ -42,6 +43,7 @@ func main() {
 			printWrong()
 			return
 		}
+		text = text[:len(text) - 1]
 		if text == "bye" {
 			return
 		}
@@ -61,3 +63,4 @@ func printWrong() {
 	fmt.Printf("\nSorry, something went wrong...\n" +
 		"lite-chat will be more awesome if u can send the err to %s\n", AUTHOR)
 }
+
