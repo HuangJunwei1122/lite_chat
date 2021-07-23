@@ -20,13 +20,13 @@ func main() {
 	//ip, port := "localhost", "8080"
 	ip, port := "123.57.29.103", "8080"
 	host := ip + ":" + port
+	fmt.Println(util.Banner)
 	fmt.Println("Welcome to lite-chat!\nYou can input 'bye' to quit anytime and input 'exit' to switch other rooms")
 	conn, err := net.Dial("tcp", host)
 	if err != nil {
 		printWrong()
 		return
 	}
-	fmt.Println("connected ")
 	defer func() {
 		conn.Close()
 		sayBye()
@@ -56,6 +56,7 @@ func main() {
 
 func sayBye() {
 	var spaces [len(GoodByeMsg)]string
+	fmt.Println(util.Banner)
 	fmt.Printf("\n%s\n%s——%s\n", GoodByeMsg, strings.Join(spaces[:], " "), LiteChat)
 }
 
